@@ -290,18 +290,24 @@ fg_score, fg_rating, fg_hist = fetch_fear_greed()
 fg_delta = None
 if fg_score is not None and fg_hist is not None and not fg_hist.empty:
     fg_series = fg_hist["fear_greed"].dropna().sort_index()
-    if len(fg_series) >= 2:
-        prev_val = float(fg_series.iloc[-2])
-        last_val = float(fg_series.iloc[-1])
-        # Prefer "today vs prior" if current score matches the latest historical point.
-        if abs(fg_score - last_val) < 0.5:
-            fg_delta = fg_score - prev_val
-        else:
-            fg_delta = fg_score - last_val
-    elif len(fg_series) == 1:
-        last_val = float(fg_series.iloc[-1])
-        if abs(fg_score - last_val) >= 0.5:
-            fg_delta = fg_score - last_val
+    if not fg_series.empty:
+        # Reduce to one point per day (latest for that day) so we compare "today vs yesterday"
+        try:
+            daily = fg_series.groupby(fg_series.index.date).last()
+        except Exception:
+            daily = fg_series
+        if len(daily) >= 2:
+            prev_val = float(daily.iloc[-2])
+            last_val = float(daily.iloc[-1])
+            # Prefer "today vs prior day" if current score matches the latest daily point.
+            if abs(fg_score - last_val) < 0.5:
+                fg_delta = fg_score - prev_val
+            else:
+                fg_delta = fg_score - last_val
+        elif len(daily) == 1:
+            last_val = float(daily.iloc[-1])
+            if abs(fg_score - last_val) >= 0.5:
+                fg_delta = fg_score - last_val
 
 # -----------------------------
 # Top KPI row
