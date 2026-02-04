@@ -287,6 +287,21 @@ sector_prices = prices[[c for c in sector_cols if c in prices.columns]].dropna(h
 
 # Fear & Greed
 fg_score, fg_rating, fg_hist = fetch_fear_greed()
+fg_delta = None
+if fg_score is not None and fg_hist is not None and not fg_hist.empty:
+    fg_series = fg_hist["fear_greed"].dropna().sort_index()
+    if len(fg_series) >= 2:
+        prev_val = float(fg_series.iloc[-2])
+        last_val = float(fg_series.iloc[-1])
+        # Prefer "today vs prior" if current score matches the latest historical point.
+        if abs(fg_score - last_val) < 0.5:
+            fg_delta = fg_score - prev_val
+        else:
+            fg_delta = fg_score - last_val
+    elif len(fg_series) == 1:
+        last_val = float(fg_series.iloc[-1])
+        if abs(fg_score - last_val) >= 0.5:
+            fg_delta = fg_score - last_val
 
 # -----------------------------
 # Top KPI row
@@ -303,7 +318,12 @@ else:
 
 # Fear & Greed KPI
 if fg_score is not None:
-    k2.metric("Fear & Greed", f"{fg_score:.0f}/100", fg_rating or "")
+    if fg_delta is not None:
+        k2.metric("Fear & Greed", f"{fg_score:.0f}/100", f"{fg_delta:+.0f} pts")
+    else:
+        k2.metric("Fear & Greed", f"{fg_score:.0f}/100")
+    if fg_rating:
+        k2.caption(fg_rating)
 else:
     k2.metric("Fear & Greed", "Unavailable", "")
 
